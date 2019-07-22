@@ -19,6 +19,17 @@ class ImportOnlyModulesChecked(checkers.BaseChecker):
         ),
     }
 
+    options = (
+        (
+            'allowed-direct-imports',
+            dict(
+                metavar='module1.import1,module2.import2',
+                default='',
+                help='A comma-separated list of exceptions.'
+            )
+        ),
+    )
+
     @utils.check_messages('import-only-modules')
     def visit_importfrom(self, node):
         try:
@@ -26,6 +37,8 @@ class ImportOnlyModulesChecked(checkers.BaseChecker):
         except astroid.AstroidBuildingException:
             # Import errors should be checked elsewhere.
             return
+
+        allowed_imports = self.config.allowed_direct_imports.split(',')
 
         if node.level is None:
             modname = node.modname
@@ -41,6 +54,9 @@ class ImportOnlyModulesChecked(checkers.BaseChecker):
                 imported_module.import_module(name, True)
                 # Good, we could import "name" as a module relative to the "imported_module".
             except astroid.AstroidImportError:
+                if f'{modname}.{name}' in allowed_imports:
+                    # The non-module import is one of the allowed ones.
+                    continue
                 self.add_message(
                   'import-only-modules',
                   node=node,
