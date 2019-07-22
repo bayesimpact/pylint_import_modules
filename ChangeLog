@@ -1,0 +1,7 @@
+CHANGES
+=======
+
+* Prepare for a pip release
+* Allow exceptions to the rule. (#1)
+* Get original version from gist
+* Initial commit
