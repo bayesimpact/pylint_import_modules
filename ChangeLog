@@ -1,7 +1,10 @@
 CHANGES
 =======
 
-* Prepare for a pip release
+v0.1.0
+------
+
+* Prepare for a pip release. (#2)
 * Allow exceptions to the rule. (#1)
 * Get original version from gist
 * Initial commit
