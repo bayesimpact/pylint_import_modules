@@ -1,16 +1,35 @@
 # From https://gist.github.com/jobevers/49432f6751753cfffea3cd2cddaaa183
 # Credit to mitar on stackoverflow: https://stackoverflow.com/a/45390670/2752242
 
-from typing import Tuple
+import re
+from typing import List, Tuple
 
 import astroid
 from pylint import checkers, interfaces
 from pylint.checkers import utils
 
+_CONFIG_HEAD_REGEX = re.compile(r',|\.(?={)')
+
 
 def _split_at_last_dot(name: str) -> Tuple[str, str]:
     all_splits = name.split('.')
     return '.'.join(all_splits[:-1]), all_splits[-1]
+
+
+# TODO(cyrille): Add relevant error messages for wrong config.
+def _parse_config(config: str) -> List[Tuple[str, str]]:
+    if not config:
+        return []
+    config = re.sub(r'\s+', '', config) + ','
+    res = []
+    while config:
+        module, config = _CONFIG_HEAD_REGEX.split(config, 1)
+        if not config.startswith('{'):
+            res.append(_split_at_last_dot(module))
+            continue
+        submodules, config = config[1:].split('},', 1)
+        res.extend((module, submodule) for submodule in submodules.split(','))
+    return res
 
 
 class ImportOnlyModulesChecked(checkers.BaseChecker):
@@ -34,9 +53,10 @@ class ImportOnlyModulesChecked(checkers.BaseChecker):
         (
             'allowed-direct-imports',
             dict(
-                metavar='module1.import1,module2.import2',
+                metavar='module1.{import1,import2},module2.import3',
                 default='',
-                help='A comma-separated list of exceptions.'
+                help='A comma-separated list of exceptions. '
+                'Imports from the same module can be factorized in curly braces',
             )
         ),
     )
@@ -44,12 +64,13 @@ class ImportOnlyModulesChecked(checkers.BaseChecker):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._imports_to_check = {}
+        self._exceptions = None
 
     @property
     def exceptions(self):
-        return [
-            _split_at_last_dot(module.strip())
-            for module in self.config.allowed_direct_imports.split(',')]
+        if self._exceptions is None:
+            self._exceptions = _parse_config(self.config.allowed_direct_imports)
+        return self._exceptions
 
     def visit_module(self, node):
         self._imports_to_check = {}
