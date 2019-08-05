@@ -1,8 +1,9 @@
 # From https://gist.github.com/jobevers/49432f6751753cfffea3cd2cddaaa183
 # Credit to mitar on stackoverflow: https://stackoverflow.com/a/45390670/2752242
 
+import collections
 import re
-from typing import List, Tuple
+from typing import Dict, Set
 
 import astroid
 from pylint import checkers, interfaces
@@ -12,18 +13,19 @@ _CONFIG_HEAD_REGEX = re.compile(r',|\.(?={)')
 
 
 # TODO(cyrille): Add relevant error messages for wrong config.
-def _parse_config(config: str) -> List[Tuple[str, str]]:
+def _parse_config(config: str) -> Dict[str, Set[str]]:
     if not config:
-        return []
+        return {}
     config = re.sub(r'\s+', '', config) + ','
-    res = []
+    res = collections.defaultdict(set)
     while config:
         module, config = _CONFIG_HEAD_REGEX.split(config, 1)
         if not config.startswith('{'):
-            res.append(tuple(module.rsplit('.', 1)))
+            module, import_ = module.rsplit('.', 1)
+            res[module].add(import_)
             continue
         submodules, config = config[1:].split('},', 1)
-        res.extend((module, submodule) for submodule in submodules.split(','))
+        res[module].update(submodules.split(','))
     return res
 
 
@@ -62,7 +64,7 @@ class ImportOnlyModulesChecked(checkers.BaseChecker):
         self._exceptions = None
 
     @property
-    def exceptions(self):
+    def exceptions(self) -> Dict[str, Set[str]]:
         if self._exceptions is None:
             self._exceptions = _parse_config(self.config.allowed_direct_imports)
         return self._exceptions
@@ -79,7 +81,8 @@ class ImportOnlyModulesChecked(checkers.BaseChecker):
         if name not in self._imports_to_check:
             return
         module_name = self._imports_to_check[name]
-        if (module_name, node.attrname) in self.exceptions:
+        exceptions = self.exceptions.get(module_name, set())
+        if exceptions.intersection({node.attrname, '*'}):
             self.add_message(
                 'import-direct-attributes',
                 node=node,
@@ -87,7 +90,7 @@ class ImportOnlyModulesChecked(checkers.BaseChecker):
 
     def visit_import(self, node):
         for (name, alias) in node.names:
-            if name in (module for module, attribute in self.exceptions):
+            if name in self.exceptions:
                 self._imports_to_check[alias or name] = name
 
     @utils.check_messages('import-only-modules')
@@ -112,10 +115,11 @@ class ImportOnlyModulesChecked(checkers.BaseChecker):
                 imported_module.import_module(name, True)
                 # Good, we could import "name" as a module relative to the "imported_module".
                 full_name = f'{modname}.{name}'
-                if full_name in (module for module, attribute in self.exceptions):
+                if full_name in self.exceptions:
                     self._imports_to_check[alias or name] = full_name
             except astroid.AstroidImportError:
-                if (modname, name) in self.exceptions:
+                exceptions = self.exceptions.get(modname, set())
+                if exceptions.intersection({name, '*'}):
                     # The non-module import is one of the allowed ones.
                     continue
                 self.add_message(
