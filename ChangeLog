@@ -1,9 +1,14 @@
 CHANGES
 =======
 
+* Make a python module rather than a script
+* [Config] Make config shorter for several imports from the same module
+* Ensure exceptions are imported directly. (#3)
+
 v0.1.0
 ------
 
+* v0.1.0
 * Prepare for a pip release. (#2)
 * Allow exceptions to the rule. (#1)
 * Get original version from gist

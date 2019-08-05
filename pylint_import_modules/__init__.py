@@ -20,7 +20,7 @@ def _parse_config(config: str) -> List[Tuple[str, str]]:
     while config:
         module, config = _CONFIG_HEAD_REGEX.split(config, 1)
         if not config.startswith('{'):
-            res.append(module.rsplit('.', 1))
+            res.append(tuple(module.rsplit('.', 1)))
             continue
         submodules, config = config[1:].split('},', 1)
         res.extend((module, submodule) for submodule in submodules.split(','))
