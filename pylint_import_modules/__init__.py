@@ -49,6 +49,7 @@ class ImportOnlyModulesChecked(checkers.BaseChecker):
             'allowed-direct-imports',
             dict(
                 metavar='module1.{import1,import2},module2.import3',
+                type='string',
                 default='',
                 help='A comma-separated list of exceptions. '
                 'Imports from the same module can be factorized in curly braces',
